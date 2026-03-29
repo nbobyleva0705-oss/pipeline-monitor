@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Alerts</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+</nav>
+
+<div class="container">
+    <h1>Alerts</h1>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Pipeline</th>
+                    <th>Message</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="5" class="state-msg">Loading…</td></tr></tbody>
+        </table>
+    </div>
+
+    <h2>Alert Rules</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Pipeline</th>
+                    <th>Condition</th>
+                    <th>Enabled</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="rules-tbody"><tr><td colspan="5" class="state-msg">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+navActive();
+
+async function loadAlerts() {
+    const tbody = document.getElementById('tbody');
+    try {
+        const alerts = await API.getAlerts();
+        if (!alerts.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="state-msg">No alerts.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = alerts.map(a => `
+            <tr>
+                <td>${badge('badge-' + a.severity) ? `<span class="badge badge-${a.severity}">${a.severity}</span>` : a.severity}</td>
+                <td>${badge(a.status)}</td>
+                <td>${a.pipeline_name || a.pipeline_id || '—'}</td>
+                <td style="font-size:.85rem">${a.message}</td>
+                <td>${fmtDate(a.created_at)}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+async function loadRules() {
+    const tbody = document.getElementById('rules-tbody');
+    try {
+        const rules = await API.getAlertRules();
+        if (!rules.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="state-msg">No alert rules.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rules.map(r => `
+            <tr>
+                <td>${r.name}</td>
+                <td>${r.pipeline_name || r.pipeline_id}</td>
+                <td><code style="font-size:.82rem">${r.condition}</code></td>
+                <td>${badge(r.enabled ? 'active' : 'inactive')}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="toggleRule('${r.id}', ${r.enabled})"
+                        style="background:${r.enabled ? '#f1f5f9' : '#dcfce7'}">
+                        ${r.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRule('${r.id}', '${r.name}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+async function toggleRule(id, currentEnabled) {
+    try {
+        await API.patchAlertRule(id, { enabled: !currentEnabled });
+        loadRules();
+    } catch (e) {
+        alert(`Error: ${e.message}`);
+    }
+}
+
+async function deleteRule(id, name) {
+    if (!confirm(`Delete alert rule "${name}"?`)) return;
+    try {
+        await API.deleteAlertRule(id);
+        loadRules();
+    } catch (e) {
+        alert(`Error: ${e.message}`);
+    }
+}
+
+loadAlerts();
+loadRules();
+setInterval(() => { loadAlerts(); loadRules(); }, 15000);
+</script>
+</body>
+</html>

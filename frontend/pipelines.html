@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Pipelines</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+</nav>
+
+<div class="container">
+    <h1>Pipelines</h1>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Dataset</th>
+                    <th>Schedule</th>
+                    <th>Active</th>
+                    <th>Last run</th>
+                    <th>Last status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="7" class="state-msg">Loading…</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Pipeline detail panel -->
+    <div id="detail-panel" style="display:none;background:#fff;border-radius:10px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:32px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 id="dp-name" style="margin:0">Pipeline detail</h2>
+            <button class="btn" onclick="closeDetail()" style="background:#f1f5f9">Close</button>
+        </div>
+        <div id="dp-meta"></div>
+        <h2 style="margin-top:24px;margin-bottom:12px">Runs</h2>
+        <div class="table-wrap" style="margin:0">
+            <table>
+                <thead><tr><th>Status</th><th>Started</th><th>Finished</th><th>Runtime</th><th>Records</th><th>Error</th></tr></thead>
+                <tbody id="dp-runs"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+navActive();
+
+let pipelines = [];
+
+async function load() {
+    const tbody = document.getElementById('tbody');
+    try {
+        pipelines = await API.getPipelines();
+        if (!pipelines.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="state-msg">No pipelines yet.</td></tr>';
+            return;
+        }
+        render();
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function render() {
+    document.getElementById('tbody').innerHTML = pipelines.map(p => `
+        <tr id="row-${p.id}">
+            <td><strong>${p.name}</strong></td>
+            <td>${p.dataset_name || p.dataset_id}</td>
+            <td><code style="font-size:.8rem">${p.schedule || '—'}</code></td>
+            <td>${badge(p.active ? 'active' : 'inactive')}</td>
+            <td>${fmtDate(p.last_run_at)}</td>
+            <td>${p.last_run_status ? badge(p.last_run_status) : '—'}</td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-primary btn-sm" onclick="openDetail('${p.id}')">Details</button>
+                <button class="btn btn-success btn-sm" onclick="runPipeline('${p.id}', '${p.name}')" ${!p.active ? 'disabled title="Pipeline is inactive"' : ''}>Run</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function runPipeline(id, name) {
+    if (!confirm(`Run pipeline "${name}"?`)) return;
+    try {
+        const run = await API.runPipeline(id);
+        alert(`Run started! Status: ${run.status}\nID: ${run.id}`);
+        load();
+    } catch (e) {
+        alert(`Error: ${e.message}`);
+    }
+}
+
+async function openDetail(id) {
+    const panel = document.getElementById('detail-panel');
+    panel.style.display = 'block';
+    document.getElementById('dp-meta').innerHTML = 'Loading…';
+    document.getElementById('dp-runs').innerHTML = '';
+
+    try {
+        const p = await API.getPipeline(id);
+        document.getElementById('dp-name').textContent = p.name;
+        document.getElementById('dp-meta').innerHTML = `
+            <div class="detail-row"><span class="key">Dataset:</span> ${p.dataset_name || p.dataset_id}</div>
+            <div class="detail-row"><span class="key">Schedule:</span> <code>${p.schedule || '—'}</code></div>
+            <div class="detail-row"><span class="key">Active:</span> ${badge(p.active ? 'active' : 'inactive')}</div>
+            <div class="detail-row"><span class="key">Description:</span> ${p.description || '—'}</div>
+            <div class="detail-row"><span class="key">Alert rules:</span> ${p.alert_rules.length}</div>
+        `;
+
+        if (!p.runs.length) {
+            document.getElementById('dp-runs').innerHTML = '<tr><td colspan="6" class="state-msg">No runs.</td></tr>';
+        } else {
+            document.getElementById('dp-runs').innerHTML = p.runs.map(r => `
+                <tr>
+                    <td>${badge(r.status)}</td>
+                    <td>${fmtDate(r.started_at)}</td>
+                    <td>${fmtDate(r.finished_at)}</td>
+                    <td>${fmtRuntime(r.started_at, r.finished_at)}</td>
+                    <td>${r.records_processed ? r.records_processed.toLocaleString() : '—'}</td>
+                    <td style="color:#dc2626;font-size:.82rem">${r.error_message || ''}</td>
+                </tr>
+            `).join('');
+        }
+        panel.scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        document.getElementById('dp-meta').innerHTML = `<span style="color:#dc2626">Error: ${e.message}</span>`;
+    }
+}
+
+function closeDetail() {
+    document.getElementById('detail-panel').style.display = 'none';
+}
+
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+"""Pipeline business logic."""
+import json
+
+
+def validate_pipeline(data):
+    errors = []
+    if not data.get('name', '').strip():
+        errors.append('name is required')
+    if not data.get('dataset_id', '').strip():
+        errors.append('dataset_id is required')
+    return errors
+
+
+def create_pipeline(db, data):
+    # Business rule: dataset must exist
+    ds = db.execute(
+        "SELECT id FROM datasets WHERE id = ?", (data['dataset_id'],)
+    ).fetchone()
+    if not ds:
+        raise ValueError(f"Dataset '{data['dataset_id']}' not found")
+
+    db.execute(
+        """INSERT INTO pipelines (dataset_id, name, description, schedule, active)
+           VALUES (?, ?, ?, ?, ?)""",
+        (
+            data['dataset_id'].strip(),
+            data['name'].strip(),
+            data.get('description', '').strip() or None,
+            data.get('schedule', '').strip() or None,
+            1 if data.get('active', True) else 0,
+        ),
+    )
+    db.commit()
+
+    pipeline = db.execute(
+        "SELECT * FROM pipelines WHERE name = ? ORDER BY created_at DESC LIMIT 1",
+        (data['name'].strip(),),
+    ).fetchone()
+    pipeline_id = pipeline['id']
+
+    # Create initial version
+    config = json.dumps(data.get('config', {}))
+    db.execute(
+        "INSERT INTO pipeline_versions (pipeline_id, version, config) VALUES (?, 1, ?)",
+        (pipeline_id, config),
+    )
+    db.commit()
+    return dict(pipeline)
+
+
+def get_all_pipelines(db):
+    rows = db.execute(
+        """SELECT p.*,
+                  d.name AS dataset_name,
+                  (SELECT status FROM job_runs WHERE pipeline_id = p.id
+                   ORDER BY started_at DESC LIMIT 1) AS last_run_status,
+                  (SELECT started_at FROM job_runs WHERE pipeline_id = p.id
+                   ORDER BY started_at DESC LIMIT 1) AS last_run_at
+           FROM pipelines p
+           LEFT JOIN datasets d ON p.dataset_id = d.id
+           ORDER BY p.created_at DESC"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_pipeline_by_id(db, pipeline_id):
+    row = db.execute(
+        """SELECT p.*, d.name AS dataset_name
+           FROM pipelines p
+           LEFT JOIN datasets d ON p.dataset_id = d.id
+           WHERE p.id = ?""",
+        (pipeline_id,),
+    ).fetchone()
+    if not row:
+        return None
+
+    pipeline = dict(row)
+
+    # Attach recent runs
+    runs = db.execute(
+        "SELECT * FROM job_runs WHERE pipeline_id = ? ORDER BY started_at DESC LIMIT 10",
+        (pipeline_id,),
+    ).fetchall()
+    pipeline['runs'] = [dict(r) for r in runs]
+
+    # Attach alert rules
+    rules = db.execute(
+        "SELECT * FROM alert_rules WHERE pipeline_id = ?", (pipeline_id,)
+    ).fetchall()
+    pipeline['alert_rules'] = [dict(r) for r in rules]
+
+    return pipeline

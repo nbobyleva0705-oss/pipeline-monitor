@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+</nav>
+
+<div class="container">
+    <h1>Dashboard</h1>
+
+    <div class="cards" id="cards">
+        <div class="state-msg">Loading…</div>
+    </div>
+
+    <h2>Recent Runs</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Pipeline</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Finished</th>
+                    <th>Runtime</th>
+                </tr>
+            </thead>
+            <tbody id="recent-runs"><tr><td colspan="5" class="state-msg">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+navActive();
+
+async function load() {
+    try {
+        const s = await API.getSummary();
+
+        document.getElementById('cards').innerHTML = `
+            <div class="card"><div class="label">Datasets</div><div class="value">${s.datasets}</div></div>
+            <div class="card"><div class="label">Pipelines</div><div class="value">${s.pipelines}</div></div>
+            <div class="card ok"><div class="label">Active pipelines</div><div class="value">${s.active_pipelines}</div></div>
+            <div class="card ${s.failed_runs_24h > 0 ? 'danger' : ''}">
+                <div class="label">Failed runs (24h)</div>
+                <div class="value">${s.failed_runs_24h}</div>
+            </div>
+            <div class="card ${s.open_alerts > 0 ? 'warn' : ''}">
+                <div class="label">Open alerts</div>
+                <div class="value">${s.open_alerts}</div>
+            </div>
+        `;
+
+        const tbody = document.getElementById('recent-runs');
+        if (!s.recent_runs.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="state-msg">No runs yet.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = s.recent_runs.map(r => `
+            <tr>
+                <td><a href="runs.html">${r.pipeline_name || r.pipeline_id}</a></td>
+                <td>${badge(r.status)}</td>
+                <td>${fmtDate(r.started_at)}</td>
+                <td>${fmtDate(r.finished_at)}</td>
+                <td>${fmtRuntime(r.started_at, r.finished_at)}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        document.getElementById('cards').innerHTML = `<div class="state-msg error">Error: ${e.message}</div>`;
+    }
+}
+
+load();
+// Auto-refresh every 10 seconds
+setInterval(load, 10000);
+</script>
+</body>
+</html>

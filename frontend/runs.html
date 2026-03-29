@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Runs</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+</nav>
+
+<div class="container">
+    <h1>Runs</h1>
+
+    <div class="filters">
+        <div>
+            <label>Pipeline</label>
+            <select id="f-pipeline">
+                <option value="">All pipelines</option>
+            </select>
+        </div>
+        <div>
+            <label>Status</label>
+            <select id="f-status">
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="running">Running</option>
+                <option value="success">Success</option>
+                <option value="failed">Failed</option>
+            </select>
+        </div>
+        <div>
+            <label>Date (YYYY-MM-DD)</label>
+            <input id="f-date" type="date">
+        </div>
+        <button class="btn btn-primary" onclick="load()">Filter</button>
+        <button class="btn" onclick="resetFilters()" style="background:#f1f5f9">Reset</button>
+    </div>
+
+    <div class="table-wrap" id="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Pipeline</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Finished</th>
+                    <th>Runtime</th>
+                    <th>Records</th>
+                    <th>Steps</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="7" class="state-msg">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+navActive();
+
+// Populate pipeline filter
+async function loadPipelines() {
+    try {
+        const ps = await API.getPipelines();
+        const sel = document.getElementById('f-pipeline');
+        ps.forEach(p => {
+            const o = document.createElement('option');
+            o.value = p.id;
+            o.textContent = p.name;
+            sel.appendChild(o);
+        });
+    } catch {}
+}
+
+async function load() {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '<tr><td colspan="7" class="state-msg">Loading…</td></tr>';
+    const params = {};
+    const pid = document.getElementById('f-pipeline').value;
+    const st = document.getElementById('f-status').value;
+    const dt = document.getElementById('f-date').value;
+    if (pid) params.pipeline_id = pid;
+    if (st)  params.status = st;
+    if (dt)  params.date = dt;
+
+    try {
+        const runs = await API.getRuns(params);
+        if (!runs.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="state-msg">No runs found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = runs.map(r => `
+            <tr>
+                <td>${r.pipeline_name || r.pipeline_id}</td>
+                <td>${badge(r.status)}</td>
+                <td>${fmtDate(r.started_at)}</td>
+                <td>${fmtDate(r.finished_at)}</td>
+                <td>${fmtRuntime(r.started_at, r.finished_at)}</td>
+                <td>${r.records_processed ? r.records_processed.toLocaleString() : '—'}</td>
+                <td>
+                    <button class="expand-btn" onclick="toggleSteps('${r.id}', this)">Show steps</button>
+                </td>
+            </tr>
+            <tr id="steps-${r.id}" style="display:none">
+                <td colspan="7" style="padding:0">
+                    <div class="details-panel open" id="steps-panel-${r.id}">
+                        <div style="color:#64748b;font-size:.82rem">Loading…</div>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+async function toggleSteps(runId, btn) {
+    const row = document.getElementById(`steps-${runId}`);
+    const panel = document.getElementById(`steps-panel-${runId}`);
+    if (row.style.display === 'none') {
+        row.style.display = '';
+        btn.textContent = 'Hide steps';
+        try {
+            const run = await API.getRun(runId);
+            if (!run.steps.length) {
+                panel.innerHTML = '<em>No steps.</em>';
+            } else {
+                panel.innerHTML = run.steps.map(s => `
+                    <div class="step">
+                        <span class="step-name">${s.name}</span>
+                        ${badge(s.status)}
+                        <span style="color:#94a3b8;font-size:.78rem">
+                            ${fmtDate(s.started_at)} → ${fmtDate(s.finished_at)}
+                        </span>
+                    </div>
+                `).join('');
+            }
+            if (run.error_message) {
+                panel.innerHTML += `<div style="color:#dc2626;margin-top:8px;font-size:.82rem">Error: ${run.error_message}</div>`;
+            }
+        } catch (e) {
+            panel.innerHTML = `<span style="color:#dc2626">Error: ${e.message}</span>`;
+        }
+    } else {
+        row.style.display = 'none';
+        btn.textContent = 'Show steps';
+    }
+}
+
+function resetFilters() {
+    document.getElementById('f-pipeline').value = '';
+    document.getElementById('f-status').value = '';
+    document.getElementById('f-date').value = '';
+    load();
+}
+
+loadPipelines();
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

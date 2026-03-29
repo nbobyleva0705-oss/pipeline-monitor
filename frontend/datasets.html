@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Datasets</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+</nav>
+
+<div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h1 style="margin:0">Datasets</h1>
+        <button class="btn btn-primary" onclick="showForm()">+ New Dataset</button>
+    </div>
+
+    <!-- Create form (hidden by default) -->
+    <div id="form-wrap" style="display:none;background:#fff;border-radius:10px;padding:24px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        <h2 style="margin-bottom:16px">New Dataset</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Name *</label>
+                <input id="f-name" type="text" placeholder="customer_transactions" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Owner *</label>
+                <input id="f-owner" type="text" placeholder="analytics-team" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Description</label>
+                <input id="f-desc" type="text" placeholder="Raw transaction data" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Schema version</label>
+                <input id="f-version" type="number" value="1" min="1" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+        </div>
+        <div id="form-error" style="color:#dc2626;font-size:.85rem;margin-top:8px;display:none;"></div>
+        <div style="margin-top:16px;display:flex;gap:8px;">
+            <button class="btn btn-success" onclick="submitForm()">Create</button>
+            <button class="btn" onclick="hideForm()" style="background:#f1f5f9">Cancel</button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Owner</th>
+                    <th>Schema version</th>
+                    <th>Description</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="5" class="state-msg">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+navActive();
+
+async function load() {
+    const tbody = document.getElementById('tbody');
+    try {
+        const datasets = await API.getDatasets();
+        if (!datasets.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="state-msg">No datasets yet.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = datasets.map(d => `
+            <tr>
+                <td><strong>${d.name}</strong></td>
+                <td>${d.owner}</td>
+                <td>${d.schema_version}</td>
+                <td>${d.description || '—'}</td>
+                <td>${fmtDate(d.created_at)}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function showForm() { document.getElementById('form-wrap').style.display = 'block'; }
+function hideForm() { document.getElementById('form-wrap').style.display = 'none'; }
+
+async function submitForm() {
+    const errEl = document.getElementById('form-error');
+    errEl.style.display = 'none';
+    try {
+        await API.createDataset({
+            name: document.getElementById('f-name').value.trim(),
+            owner: document.getElementById('f-owner').value.trim(),
+            description: document.getElementById('f-desc').value.trim(),
+            schema_version: parseInt(document.getElementById('f-version').value) || 1,
+        });
+        hideForm();
+        load();
+    } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+    }
+}
+
+load();
+</script>
+</body>
+</html>
