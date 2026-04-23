@@ -6,6 +6,7 @@ from services.pipeline_service import (
     create_pipeline,
     create_pipeline_version,
     get_all_pipelines,
+    get_all_versions,
     get_pipeline_by_id,
     get_pipeline_versions,
     patch_pipeline,
@@ -49,6 +50,11 @@ def update_pipeline(pipeline_id):
     if not pipeline:
         return jsonify({'error': 'Pipeline not found'}), 404
     return jsonify(pipeline)
+
+
+@bp.get('/versions/all')
+def list_all_versions():
+    return jsonify(get_all_versions(get_db()))
 
 
 @bp.get('/<pipeline_id>/versions')

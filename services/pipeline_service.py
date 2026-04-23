@@ -113,6 +113,16 @@ def get_pipeline_by_id(db, pipeline_id):
     return pipeline
 
 
+def get_all_versions(db):
+    rows = db.execute(
+        """SELECT pv.*, p.name AS pipeline_name
+           FROM pipeline_versions pv
+           LEFT JOIN pipelines p ON pv.pipeline_id = p.id
+           ORDER BY pv.pipeline_id, pv.version DESC"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_pipeline_versions(db, pipeline_id):
     rows = db.execute(
         "SELECT * FROM pipeline_versions WHERE pipeline_id = ? ORDER BY version DESC",

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Versions</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+    .ver-badge {
+        background:#e0e7ff;color:#3730a3;
+        padding:3px 10px;border-radius:12px;
+        font-size:.78rem;font-weight:700;
+    }
+    .status-active   { background:#dcfce7;color:#166534; }
+    .status-expired  { background:#fee2e2;color:#991b1b; }
+    .status-inactive { background:#f1f5f9;color:#64748b; }
+    .status-pill {
+        padding:2px 10px;border-radius:12px;
+        font-size:.75rem;font-weight:700;
+    }
+    .filters { display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap; }
+    .filters label { font-size:.8rem;color:#64748b;display:block;margin-bottom:4px; }
+    .filters select { padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.85rem; }
+    .inactive-row { opacity:.55; }
+    .config-cell { max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem;color:#475569; }
+    .stat-cards { display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap; }
+    .stat-card { background:#fff;border-radius:10px;padding:18px 24px;box-shadow:0 1px 4px rgba(0,0,0,0.08);min-width:130px; }
+    .stat-card .val { font-size:1.8rem;font-weight:700; }
+    .stat-card .lbl { font-size:.75rem;color:#64748b;margin-top:2px; }
+</style>
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+    <a href="versions.html">Versions</a>
+    <a href="popis.html">Popis</a>
+</nav>
+
+<div class="container">
+    <h1>Pipeline Versions</h1>
+
+    <!-- Stat cards -->
+    <div class="stat-cards" id="stat-cards">
+        <div class="stat-card"><div class="val" id="s-total">—</div><div class="lbl">Total versions</div></div>
+        <div class="stat-card"><div class="val" style="color:#16a34a" id="s-active">—</div><div class="lbl">Active</div></div>
+        <div class="stat-card"><div class="val" style="color:#dc2626" id="s-expired">—</div><div class="lbl">Expired</div></div>
+        <div class="stat-card"><div class="val" style="color:#64748b" id="s-inactive">—</div><div class="lbl">Inactive</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <div>
+            <label>Pipeline</label>
+            <select id="f-pipeline" onchange="render()">
+                <option value="">All pipelines</option>
+            </select>
+        </div>
+        <div>
+            <label>Status</label>
+            <select id="f-status" onchange="render()">
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+        <button class="btn" onclick="resetFilters()" style="background:#f1f5f9">Reset</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Pipeline</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Expires at</th>
+                    <th>Config</th>
+                </tr>
+            </thead>
+            <tbody id="tbody">
+                <tr><td colspan="6" class="state-msg">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+navActive();
+
+let allVersions = [];
+
+function versionStatus(v) {
+    if (v.is_active === 1 || v.is_active === true) return 'active';
+    if (v.expires_at && new Date(normalizeTs(v.expires_at)) < new Date()) return 'expired';
+    return 'inactive';
+}
+
+async function load() {
+    try {
+        allVersions = await API.getAllVersions();
+
+        // Populate pipeline filter
+        const pipelines = [...new Map(allVersions.map(v => [v.pipeline_id, v.pipeline_name])).entries()];
+        const sel = document.getElementById('f-pipeline');
+        pipelines.forEach(([id, name]) => {
+            if (!sel.querySelector(`option[value="${id}"]`)) {
+                const o = document.createElement('option');
+                o.value = id;
+                o.textContent = name || id;
+                sel.appendChild(o);
+            }
+        });
+
+        // Stats
+        const statuses = allVersions.map(versionStatus);
+        document.getElementById('s-total').textContent   = allVersions.length;
+        document.getElementById('s-active').textContent  = statuses.filter(s => s === 'active').length;
+        document.getElementById('s-expired').textContent = statuses.filter(s => s === 'expired').length;
+        document.getElementById('s-inactive').textContent= statuses.filter(s => s === 'inactive').length;
+
+        render();
+    } catch (e) {
+        document.getElementById('tbody').innerHTML =
+            `<tr><td colspan="6" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function render() {
+    const filterPipeline = document.getElementById('f-pipeline').value;
+    const filterStatus   = document.getElementById('f-status').value;
+
+    let rows = allVersions;
+    if (filterPipeline) rows = rows.filter(v => v.pipeline_id === filterPipeline);
+    if (filterStatus)   rows = rows.filter(v => versionStatus(v) === filterStatus);
+
+    if (!rows.length) {
+        document.getElementById('tbody').innerHTML =
+            '<tr><td colspan="6" class="state-msg">No versions found.</td></tr>';
+        return;
+    }
+
+    document.getElementById('tbody').innerHTML = rows.map(v => {
+        const st = versionStatus(v);
+        const statusClass = `status-${st}`;
+        const isInactive  = st !== 'active';
+
+        let configStr = '—';
+        try {
+            const parsed = JSON.parse(v.config);
+            configStr = Object.keys(parsed).length === 0 ? '(empty)' : JSON.stringify(parsed);
+        } catch {}
+
+        return `<tr class="${isInactive ? 'inactive-row' : ''}">
+            <td><span class="ver-badge">v${v.version}</span></td>
+            <td style="font-weight:600">${v.pipeline_name || v.pipeline_id}</td>
+            <td><span class="status-pill ${statusClass}">${st}</span></td>
+            <td style="font-size:.83rem;color:#64748b">${fmtDate(v.created_at)}</td>
+            <td style="font-size:.83rem;color:${st === 'expired' ? '#dc2626' : '#64748b'}">${v.expires_at ? fmtDate(v.expires_at) : '—'}</td>
+            <td class="config-cell" title="${configStr.replace(/"/g,"&quot;")}">${configStr}</td>
+        </tr>`;
+    }).join('');
+}
+
+function resetFilters() {
+    document.getElementById('f-pipeline').value = '';
+    document.getElementById('f-status').value   = '';
+    render();
+}
+
+load();
+</script>
+</body>
+</html>
