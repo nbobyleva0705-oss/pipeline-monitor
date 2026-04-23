@@ -50,15 +50,22 @@ function badge(status) {
     return `<span class="badge badge-${status}">${status}</span>`;
 }
 
+function normalizeTs(ts) {
+    if (!ts) return null;
+    // Python isoformat() returns +00:00, replace with Z
+    const s = ts.replace('+00:00', 'Z');
+    return s.endsWith('Z') ? s : s + 'Z';
+}
+
 function fmtDate(ts) {
     if (!ts) return '—';
-    const d = new Date(ts.endsWith('Z') ? ts : ts + 'Z');
-    return d.toLocaleString();
+    const d = new Date(normalizeTs(ts));
+    return isNaN(d) ? ts : d.toLocaleString();
 }
 
 function fmtRuntime(start, end) {
     if (!start || !end) return '—';
-    const s = Math.round((new Date(end + 'Z') - new Date(start + 'Z')) / 1000);
+    const s = Math.round((new Date(normalizeTs(end)) - new Date(normalizeTs(start))) / 1000);
     if (s < 60) return `${s}s`;
     return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
