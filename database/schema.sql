@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS pipeline_versions (
     pipeline_id TEXT NOT NULL REFERENCES pipelines(id),
     version     INTEGER NOT NULL DEFAULT 1,
     config      TEXT NOT NULL DEFAULT '{}',
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    expires_at  TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

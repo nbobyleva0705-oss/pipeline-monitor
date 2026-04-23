@@ -87,6 +87,10 @@
         <div id="ver-form" style="display:none;background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:16px;">
             <p style="margin:0 0 8px;font-size:.83rem;color:#475569">Zadej nový config pipeline jako JSON:</p>
             <textarea id="ver-config" rows="4" placeholder='{"engine": "spark", "query": "SELECT ..."}' style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-family:monospace;font-size:.82rem;box-sizing:border-box;"></textarea>
+            <div style="margin-top:10px;">
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Срок действия (expires at) — необязательно</label>
+                <input id="ver-expires" type="datetime-local" style="padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:.83rem;">
+            </div>
             <div id="ver-error" style="color:#dc2626;font-size:.82rem;margin-top:6px;display:none;"></div>
             <div style="margin-top:10px;display:flex;gap:8px;">
                 <button class="btn btn-success btn-sm" onclick="submitVersion()">Create</button>
@@ -96,8 +100,8 @@
 
         <div class="table-wrap" style="margin:0 0 24px;">
             <table>
-                <thead><tr><th>Version</th><th>Created</th><th>Config</th></tr></thead>
-                <tbody id="dp-versions"><tr><td colspan="3" class="state-msg">Loading…</td></tr></tbody>
+                <thead><tr><th>Version</th><th>Status</th><th>Created</th><th>Expires at</th><th>Config</th></tr></thead>
+                <tbody id="dp-versions"><tr><td colspan="5" class="state-msg">Loading…</td></tr></tbody>
             </table>
         </div>
 
@@ -286,20 +290,33 @@ async function loadVersions(pipelineId) {
     try {
         const versions = await API.getPipelineVersions(pipelineId);
         if (!versions.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="state-msg">No versions.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="state-msg">No versions.</td></tr>';
             return;
         }
-        tbody.innerHTML = versions.map((v, i) => {
+        tbody.innerHTML = versions.map(v => {
             let configStr = '—';
-            try { configStr = JSON.stringify(JSON.parse(v.config), null, 2); } catch {}
-            const isEmpty = configStr === '{}' || configStr === 'null';
-            return `<tr>
+            try {
+                const parsed = JSON.parse(v.config);
+                configStr = Object.keys(parsed).length === 0 ? '(empty)' : JSON.stringify(parsed);
+            } catch {}
+
+            const isActive = v.is_active === 1 || v.is_active === true;
+            const isExpired = v.expires_at && new Date(normalizeTs(v.expires_at)) < new Date();
+
+            const statusBadge = isActive
+                ? '<span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:700">active</span>'
+                : isExpired
+                    ? '<span style="background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:700">expired</span>'
+                    : '<span style="background:#f1f5f9;color:#64748b;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:700">inactive</span>';
+
+            return `<tr style="${!isActive ? 'opacity:.6' : ''}">
                 <td>
                     <span style="background:#e0e7ff;color:#3730a3;padding:3px 10px;border-radius:12px;font-size:.82rem;font-weight:700">v${v.version}</span>
-                    ${i === 0 ? '<span style="margin-left:6px;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600">current</span>' : ''}
                 </td>
+                <td>${statusBadge}</td>
                 <td style="font-size:.83rem;color:#64748b">${fmtDate(v.created_at)}</td>
-                <td><code style="font-size:.78rem;color:#475569">${isEmpty ? '(empty)' : configStr.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</code></td>
+                <td style="font-size:.83rem;color:${isExpired ? '#dc2626' : '#64748b'}">${v.expires_at ? fmtDate(v.expires_at) : '—'}</td>
+                <td><code style="font-size:.78rem;color:#475569">${configStr}</code></td>
             </tr>`;
         }).join('');
     } catch (e) {
@@ -315,6 +332,7 @@ function showVersionForm() {
 
 function hideVersionForm() {
     document.getElementById('ver-form').style.display = 'none';
+    document.getElementById('ver-expires').value = '';
 }
 
 async function submitVersion() {
@@ -326,8 +344,10 @@ async function submitVersion() {
         try { config = JSON.parse(raw); }
         catch { errEl.textContent = 'Neplatný JSON'; errEl.style.display = 'block'; return; }
     }
+    const expiresRaw = document.getElementById('ver-expires').value;
+    const expiresAt = expiresRaw ? new Date(expiresRaw).toISOString() : null;
     try {
-        await API.createPipelineVersion(currentPipelineId, { config });
+        await API.createPipelineVersion(currentPipelineId, { config, expires_at: expiresAt });
         hideVersionForm();
         loadVersions(currentPipelineId);
     } catch (e) {

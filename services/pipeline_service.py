@@ -132,10 +132,19 @@ def create_pipeline_version(db, pipeline_id, data):
     ).fetchone()
     next_version = (last['version'] + 1) if last else 1
 
-    config = json.dumps(data.get('config', {}))
+    # Deactivate all previous versions and set their expiry to now
     db.execute(
-        "INSERT INTO pipeline_versions (pipeline_id, version, config) VALUES (?, ?, ?)",
-        (pipeline_id, next_version, config),
+        """UPDATE pipeline_versions
+           SET is_active = 0, expires_at = datetime('now')
+           WHERE pipeline_id = ? AND is_active = 1""",
+        (pipeline_id,),
+    )
+
+    config = json.dumps(data.get('config', {}))
+    expires_at = data.get('expires_at') or None
+    db.execute(
+        "INSERT INTO pipeline_versions (pipeline_id, version, config, is_active, expires_at) VALUES (?, ?, ?, 1, ?)",
+        (pipeline_id, next_version, config, expires_at),
     )
     db.commit()
 
