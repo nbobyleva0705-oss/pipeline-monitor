@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Monitor — Popis</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+    .popis-section { background:#fff; border-radius:10px; padding:32px; margin-bottom:24px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+    .popis-section h2 { margin-top:0; border-bottom:2px solid #e2e8f0; padding-bottom:10px; }
+    .popis-section h3 { color:#3b82f6; margin-top:24px; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+    .tag { padding:4px 12px; border-radius:20px; font-size:.8rem; font-weight:600; }
+    .tag-green  { background:#dcfce7; color:#166534; }
+    .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+    .tag-yellow { background:#fef9c3; color:#92400e; }
+    .tag-red    { background:#fee2e2; color:#991b1b; }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:640px){ .two-col{ grid-template-columns:1fr; } }
+    .info-card { background:#f8fafc; border-radius:8px; padding:16px; }
+    .info-card h4 { margin:0 0 8px; font-size:.9rem; color:#475569; }
+    .info-card p  { margin:0; font-size:.85rem; color:#1e293b; }
+    .lifecycle { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:16px 0; }
+    .lifecycle-step { background:#dbeafe; color:#1d4ed8; padding:6px 14px; border-radius:6px; font-size:.85rem; font-weight:600; }
+    .lifecycle-arrow { color:#94a3b8; font-size:1.1rem; }
+    table.popis-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.popis-table th { background:#f1f5f9; text-align:left; padding:8px 12px; color:#475569; }
+    table.popis-table td { padding:8px 12px; border-top:1px solid #e2e8f0; }
+    table.popis-table code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:.8rem; }
+    .check { color:#16a34a; font-weight:700; }
+    .cross { color:#dc2626; font-weight:700; }
+    .etl-flow { display:flex; gap:0; margin:16px 0; }
+    .etl-step { flex:1; text-align:center; padding:14px 8px; font-weight:600; font-size:.85rem; }
+    .etl-extract   { background:#dbeafe; color:#1d4ed8; border-radius:8px 0 0 8px; }
+    .etl-transform { background:#fef9c3; color:#92400e; }
+    .etl-load      { background:#dcfce7; color:#166534; border-radius:0 8px 8px 0; }
+    .etl-step small { display:block; font-weight:400; color:#64748b; font-size:.75rem; margin-top:4px; }
+</style>
+</head>
+<body>
+<nav>
+    <a class="brand" href="index.html">Pipeline Monitor</a>
+    <a href="index.html">Dashboard</a>
+    <a href="datasets.html">Datasets</a>
+    <a href="pipelines.html">Pipelines</a>
+    <a href="runs.html">Runs</a>
+    <a href="alerts.html">Alerts</a>
+    <a href="popis.html">Popis</a>
+</nav>
+
+<div class="container">
+    <h1>Popis aplikace</h1>
+
+    <!-- Co to je -->
+    <div class="popis-section">
+        <h2>Co je Pipeline Monitor?</h2>
+        <p>
+            <strong>Pipeline Monitor</strong> je webová aplikace pro evidenci, spouštění a sledování
+            datových pipeline nad datovými zdroji, včetně monitoringu běhů a upozornění na problémy.
+        </p>
+        <p>
+            Jde o <strong>simulaci orchestrace a monitoringu</strong> — projekt napodobuje reálné systémy
+            jako Apache Airflow, Databricks Jobs nebo AWS Glue, ale neprovádí skutečné distribuované výpočty.
+        </p>
+        <div class="tag-list">
+            <span class="tag tag-blue">Python 3 + Flask</span>
+            <span class="tag tag-blue">SQLite</span>
+            <span class="tag tag-blue">Vanilla JS</span>
+            <span class="tag tag-green">REST API</span>
+            <span class="tag tag-green">SPA Frontend</span>
+        </div>
+    </div>
+
+    <!-- Co dělá / Co nedělá -->
+    <div class="popis-section">
+        <h2>Rozsah aplikace</h2>
+        <div class="two-col">
+            <div class="info-card">
+                <h4>✅ Aplikace dělá</h4>
+                <ul style="margin:0;padding-left:18px;font-size:.85rem;line-height:1.8">
+                    <li>Eviduje datasety (zdroje dat)</li>
+                    <li>Eviduje pipeline a jejich verze</li>
+                    <li>Spouští pipeline manuálně</li>
+                    <li>Sleduje běhy (runs) a jejich kroky</li>
+                    <li>Zobrazuje stav běhů v reálném čase</li>
+                    <li>Spravuje pravidla alertů</li>
+                    <li>Automaticky vytváří alerty při selhání</li>
+                    <li>Poskytuje dashboard s přehledem</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4>❌ Aplikace nedělá</h4>
+                <ul style="margin:0;padding-left:18px;font-size:.85rem;line-height:1.8">
+                    <li>Neprovádí skutečné distribuované výpočty</li>
+                    <li>Není to Spark ani Airflow</li>
+                    <li>Neřeší fyzickou orchestraci clusteru</li>
+                    <li>Neumí skutečný cron scheduler</li>
+                    <li>Nepracuje s reálnými big data soubory</li>
+                    <li>Nemá autentizaci / uživatele</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ETL simulace -->
+    <div class="popis-section">
+        <h2>Jak funguje simulace ETL běhu</h2>
+        <p>Po kliknutí na <strong>Run pipeline</strong> se spustí simulace v pozadí (Python thread):</p>
+
+        <div class="etl-flow">
+            <div class="etl-step etl-extract">Extract<small>načtení dat</small></div>
+            <div class="etl-step etl-transform">Transform<small>zpracování</small></div>
+            <div class="etl-step etl-load">Load<small>uložení výsledků</small></div>
+        </div>
+
+        <ul style="font-size:.85rem;line-height:2">
+            <li>Každý krok trvá náhodně <strong>0,3–0,8 sekundy</strong></li>
+            <li>S pravděpodobností <strong>30 %</strong> jeden krok selže → run skončí <code>failed</code></li>
+            <li>Při selhání se automaticky vytvoří <strong>alert event</strong> pro všechna aktivní pravidla</li>
+            <li>Při úspěchu se zaznamená náhodný počet zpracovaných záznamů (<strong>5 000–200 000</strong>)</li>
+        </ul>
+
+        <div class="lifecycle">
+            <span class="lifecycle-step">pending</span>
+            <span class="lifecycle-arrow">→</span>
+            <span class="lifecycle-step">running</span>
+            <span class="lifecycle-arrow">→</span>
+            <span class="lifecycle-step" style="background:#dcfce7;color:#166534">success</span>
+            <span class="lifecycle-arrow">/</span>
+            <span class="lifecycle-step" style="background:#fee2e2;color:#991b1b">failed</span>
+        </div>
+    </div>
+
+    <!-- Databáze -->
+    <div class="popis-section">
+        <h2>Datový model</h2>
+        <table class="popis-table">
+            <thead><tr><th>Tabulka</th><th>Co ukládá</th></tr></thead>
+            <tbody>
+                <tr><td><code>datasets</code></td><td>Zdroje dat — název, owner, verze schématu</td></tr>
+                <tr><td><code>pipelines</code></td><td>Definice pipeline — dataset, schedule, aktivní stav</td></tr>
+                <tr><td><code>pipeline_versions</code></td><td>Verze konfigurace pipeline (JSON)</td></tr>
+                <tr><td><code>job_runs</code></td><td>Konkrétní spuštění — stav, čas, počet záznamů, chyba</td></tr>
+                <tr><td><code>job_run_steps</code></td><td>Kroky každého běhu: extract / transform / load</td></tr>
+                <tr><td><code>alert_rules</code></td><td>Pravidla alertů vázaná na pipeline</td></tr>
+                <tr><td><code>alert_events</code></td><td>Vzniklé alerty — severity: info / warning / critical</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- API -->
+    <div class="popis-section">
+        <h2>REST API přehled</h2>
+        <div class="two-col">
+            <div>
+                <h3>Datasety</h3>
+                <table class="popis-table">
+                    <tr><td><code>GET</code></td><td><code>/datasets/</code></td></tr>
+                    <tr><td><code>POST</code></td><td><code>/datasets/</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/datasets/:id</code></td></tr>
+                </table>
+                <h3>Pipeline</h3>
+                <table class="popis-table">
+                    <tr><td><code>GET</code></td><td><code>/pipelines/</code></td></tr>
+                    <tr><td><code>POST</code></td><td><code>/pipelines/</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/pipelines/:id</code></td></tr>
+                    <tr><td><code>PATCH</code></td><td><code>/pipelines/:id</code></td></tr>
+                    <tr><td><code>POST</code></td><td><code>/pipelines/:id/run</code></td></tr>
+                </table>
+            </div>
+            <div>
+                <h3>Běhy</h3>
+                <table class="popis-table">
+                    <tr><td><code>GET</code></td><td><code>/runs/</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/runs/:id</code></td></tr>
+                    <tr><td><code>PATCH</code></td><td><code>/runs/:id</code></td></tr>
+                </table>
+                <h3>Alerty</h3>
+                <table class="popis-table">
+                    <tr><td><code>GET/POST</code></td><td><code>/alert-rules/</code></td></tr>
+                    <tr><td><code>GET/PATCH/DELETE</code></td><td><code>/alert-rules/:id</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/alerts/</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/alerts/:id</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/api/summary</code></td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Architektura -->
+    <div class="popis-section">
+        <h2>Architektura backendu</h2>
+        <p style="font-size:.85rem">Aplikace používá vzor <strong>Blueprint + Service Layer</strong>:</p>
+        <div class="two-col">
+            <div class="info-card">
+                <h4>routes/</h4>
+                <p>Pouze HTTP — přijímají request, volají service, vrací JSON. Žádná business logika.</p>
+            </div>
+            <div class="info-card">
+                <h4>services/</h4>
+                <p>Veškerá business logika — validace, databázové operace, pravidla.</p>
+            </div>
+            <div class="info-card">
+                <h4>db.py + SQLite</h4>
+                <p>Jednoduchá SQLite databáze s cizími klíči a CHECK constraints. Soubor <code>pipeline_monitor.db</code>.</p>
+            </div>
+            <div class="info-card">
+                <h4>threading.Thread</h4>
+                <p>Simulace ETL běhu probíhá v pozadí — server neblokuje response a kroky se aktualizují asynchronně.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Jak spustit -->
+    <div class="popis-section">
+        <h2>Jak spustit</h2>
+        <pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;font-size:.82rem;overflow-x:auto">cd pipeline_monitor
+
+# Poprvé
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+
+# Spuštění
+python app.py</pre>
+        <p style="font-size:.85rem">Aplikace běží na <strong>http://localhost:5000</strong> — dashboard se automaticky obnovuje každých 10 sekund.</p>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>navActive();</script>
+</body>
+</html>
