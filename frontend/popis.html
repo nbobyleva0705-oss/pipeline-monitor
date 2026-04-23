@@ -69,6 +69,8 @@
             <span class="tag tag-blue">Vanilla JS</span>
             <span class="tag tag-green">REST API</span>
             <span class="tag tag-green">SPA Frontend</span>
+            <span class="tag tag-yellow">Versioning</span>
+            <span class="tag tag-red">Alert system</span>
         </div>
     </div>
 
@@ -80,13 +82,14 @@
                 <h4>✅ Aplikace dělá</h4>
                 <ul style="margin:0;padding-left:18px;font-size:.85rem;line-height:1.8">
                     <li>Eviduje datasety (zdroje dat)</li>
-                    <li>Eviduje pipeline a jejich verze</li>
-                    <li>Spouští pipeline manuálně</li>
-                    <li>Sleduje běhy (runs) a jejich kroky</li>
-                    <li>Zobrazuje stav běhů v reálném čase</li>
-                    <li>Spravuje pravidla alertů</li>
-                    <li>Automaticky vytváří alerty při selhání</li>
-                    <li>Poskytuje dashboard s přehledem</li>
+                    <li>Eviduje pipeline — vytváření, aktivace/deaktivace</li>
+                    <li>Spravuje <strong>verze pipeline</strong> (is_active, expires_at, JSON config)</li>
+                    <li>Spouští pipeline manuálně tlačítkem Run</li>
+                    <li>Sleduje běhy a jejich ETL kroky v reálném čase</li>
+                    <li>Zobrazuje statistiky pipeline (success/failed/avg runtime)</li>
+                    <li>Spravuje pravidla alertů — vytváření, zapínání/vypínání, mazání</li>
+                    <li>Automaticky vytváří alerty při selhání běhu</li>
+                    <li>Poskytuje dashboard s přehledem a autorefresh</li>
                 </ul>
             </div>
             <div class="info-card">
@@ -140,7 +143,7 @@
             <tbody>
                 <tr><td><code>datasets</code></td><td>Zdroje dat — název, owner, verze schématu</td></tr>
                 <tr><td><code>pipelines</code></td><td>Definice pipeline — dataset, schedule, aktivní stav</td></tr>
-                <tr><td><code>pipeline_versions</code></td><td>Verze konfigurace pipeline (JSON)</td></tr>
+                <tr><td><code>pipeline_versions</code></td><td>Verze pipeline — JSON config, is_active, expires_at</td></tr>
                 <tr><td><code>job_runs</code></td><td>Konkrétní spuštění — stav, čas, počet záznamů, chyba</td></tr>
                 <tr><td><code>job_run_steps</code></td><td>Kroky každého běhu: extract / transform / load</td></tr>
                 <tr><td><code>alert_rules</code></td><td>Pravidla alertů vázaná na pipeline</td></tr>
@@ -167,6 +170,9 @@
                     <tr><td><code>GET</code></td><td><code>/pipelines/:id</code></td></tr>
                     <tr><td><code>PATCH</code></td><td><code>/pipelines/:id</code></td></tr>
                     <tr><td><code>POST</code></td><td><code>/pipelines/:id/run</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/pipelines/versions/all</code></td></tr>
+                    <tr><td><code>GET</code></td><td><code>/pipelines/:id/versions</code></td></tr>
+                    <tr><td><code>POST</code></td><td><code>/pipelines/:id/versions</code></td></tr>
                 </table>
             </div>
             <div>
@@ -186,6 +192,48 @@
                 </table>
             </div>
         </div>
+    </div>
+
+    <!-- Systém verzí -->
+    <div class="popis-section">
+        <h2>Systém verzí pipeline</h2>
+        <p style="font-size:.85rem">Každá pipeline má historii verzí konfigurace. Verze sleduje změny v čase a umožňuje vidět, s jakým nastavením byl každý běh spuštěn.</p>
+        <div class="two-col">
+            <div class="info-card">
+                <h4>Stavy verze</h4>
+                <ul style="margin:0;padding-left:16px;font-size:.83rem;line-height:1.9">
+                    <li><strong style="color:#166534">active</strong> — aktuální platná verze</li>
+                    <li><strong style="color:#991b1b">expired</strong> — platnost vypršela (expires_at v minulosti)</li>
+                    <li><strong style="color:#64748b">inactive</strong> — nahrazena novější verzí</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4>Pravidla</h4>
+                <ul style="margin:0;padding-left:16px;font-size:.83rem;line-height:1.9">
+                    <li>Při vytvoření nové verze se předchozí automaticky deaktivuje</li>
+                    <li>Každý běh (JobRun) zaznamenává číslo verze, se kterou byl spuštěn</li>
+                    <li>Verze může mít volitelný datum expirace (expires_at)</li>
+                    <li>Config je libovolný JSON objekt</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stránky aplikace -->
+    <div class="popis-section">
+        <h2>Stránky aplikace</h2>
+        <table class="popis-table">
+            <thead><tr><th>Stránka</th><th>URL</th><th>Co zobrazuje</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Dashboard</strong></td><td><code>/</code></td><td>Souhrnné karty (datasety, pipeline, failed runs, alerty) + posledních 5 běhů. Autorefresh 10 s.</td></tr>
+                <tr><td><strong>Datasets</strong></td><td><code>/datasets.html</code></td><td>Seznam datasetů, formulář pro vytvoření nového.</td></tr>
+                <tr><td><strong>Pipelines</strong></td><td><code>/pipelines.html</code></td><td>Seznam pipeline s akcemi Run / Activate / Deactivate. Detail s verzemi, statistikami a historií běhů.</td></tr>
+                <tr><td><strong>Runs</strong></td><td><code>/runs.html</code></td><td>Historie všech běhů, filtry podle pipeline/stavu/data. Rozbalovací kroky ETL.</td></tr>
+                <tr><td><strong>Alerts</strong></td><td><code>/alerts.html</code></td><td>Seznam alertů s legendou severity. Správa pravidel alertů.</td></tr>
+                <tr><td><strong>Versions</strong></td><td><code>/versions.html</code></td><td>Přehled všech verzí všech pipeline s filtry a statistickými kartami.</td></tr>
+                <tr><td><strong>Popis</strong></td><td><code>/popis.html</code></td><td>Tato stránka — dokumentace aplikace.</td></tr>
+            </tbody>
+        </table>
     </div>
 
     <!-- Architektura -->
