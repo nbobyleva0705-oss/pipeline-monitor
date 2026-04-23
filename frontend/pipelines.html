@@ -17,7 +17,40 @@
 </nav>
 
 <div class="container">
-    <h1>Pipelines</h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h1 style="margin:0">Pipelines</h1>
+        <button class="btn btn-primary" onclick="showForm()">+ New Pipeline</button>
+    </div>
+
+    <!-- Create pipeline form -->
+    <div id="form-wrap" style="display:none;background:#fff;border-radius:10px;padding:24px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        <h2 style="margin-bottom:16px">New Pipeline</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Name *</label>
+                <input id="f-name" type="text" placeholder="daily-aggregation" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Dataset *</label>
+                <select id="f-dataset" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+                    <option value="">— select dataset —</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Description</label>
+                <input id="f-desc" type="text" placeholder="Daily revenue aggregation" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Schedule (cron)</label>
+                <input id="f-schedule" type="text" placeholder="0 2 * * *" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+        </div>
+        <div id="form-error" style="color:#dc2626;font-size:.85rem;margin-top:8px;display:none;"></div>
+        <div style="margin-top:16px;display:flex;gap:8px;">
+            <button class="btn btn-success" onclick="submitForm()">Create</button>
+            <button class="btn" onclick="hideForm()" style="background:#f1f5f9">Cancel</button>
+        </div>
+    </div>
 
     <div class="table-wrap">
         <table>
@@ -59,6 +92,54 @@ navActive();
 
 let pipelines = [];
 
+async function showForm() {
+    document.getElementById('form-wrap').style.display = 'block';
+    const sel = document.getElementById('f-dataset');
+    if (sel.options.length <= 1) {
+        try {
+            const datasets = await API.getDatasets();
+            datasets.forEach(d => {
+                const o = document.createElement('option');
+                o.value = d.id;
+                o.textContent = d.name;
+                sel.appendChild(o);
+            });
+        } catch {}
+    }
+}
+
+function hideForm() {
+    document.getElementById('form-wrap').style.display = 'none';
+    document.getElementById('form-error').style.display = 'none';
+}
+
+async function submitForm() {
+    const errEl = document.getElementById('form-error');
+    errEl.style.display = 'none';
+    try {
+        await API.createPipeline({
+            name: document.getElementById('f-name').value.trim(),
+            dataset_id: document.getElementById('f-dataset').value,
+            description: document.getElementById('f-desc').value.trim(),
+            schedule: document.getElementById('f-schedule').value.trim(),
+        });
+        hideForm();
+        load();
+    } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+    }
+}
+
+async function toggleActive(id, currentActive) {
+    try {
+        await API.patchPipeline(id, { active: !currentActive });
+        load();
+    } catch (e) {
+        alert(`Error: ${e.message}`);
+    }
+}
+
 async function load() {
     const tbody = document.getElementById('tbody');
     try {
@@ -85,6 +166,10 @@ function render() {
             <td style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="btn btn-primary btn-sm" onclick="openDetail('${p.id}')">Details</button>
                 <button class="btn btn-success btn-sm" onclick="runPipeline('${p.id}', '${p.name}')" ${!p.active ? 'disabled title="Pipeline is inactive"' : ''}>Run</button>
+                <button class="btn btn-sm" onclick="toggleActive('${p.id}', ${p.active})"
+                    style="background:${p.active ? '#fef9c3;color:#92400e' : '#dcfce7;color:#166534'}">
+                    ${p.active ? 'Deactivate' : 'Activate'}
+                </button>
             </td>
         </tr>
     `).join('');
@@ -110,12 +195,36 @@ async function openDetail(id) {
     try {
         const p = await API.getPipeline(id);
         document.getElementById('dp-name').textContent = p.name;
+        const st = p.stats || {};
+        const avgRuntime = st.avg_runtime_seconds != null
+            ? (st.avg_runtime_seconds < 60
+                ? `${Math.round(st.avg_runtime_seconds)}s`
+                : `${Math.floor(st.avg_runtime_seconds / 60)}m ${Math.round(st.avg_runtime_seconds % 60)}s`)
+            : '—';
         document.getElementById('dp-meta').innerHTML = `
             <div class="detail-row"><span class="key">Dataset:</span> ${p.dataset_name || p.dataset_id}</div>
             <div class="detail-row"><span class="key">Schedule:</span> <code>${p.schedule || '—'}</code></div>
             <div class="detail-row"><span class="key">Active:</span> ${badge(p.active ? 'active' : 'inactive')}</div>
             <div class="detail-row"><span class="key">Description:</span> ${p.description || '—'}</div>
             <div class="detail-row"><span class="key">Alert rules:</span> ${p.alert_rules.length}</div>
+            <div style="display:flex;gap:24px;margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px;">
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:700">${st.total_runs || 0}</div>
+                    <div style="font-size:.75rem;color:#64748b">Total runs</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:700;color:#16a34a">${st.success_runs || 0}</div>
+                    <div style="font-size:.75rem;color:#64748b">Successful</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:700;color:#dc2626">${st.failed_runs || 0}</div>
+                    <div style="font-size:.75rem;color:#64748b">Failed</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:700">${avgRuntime}</div>
+                    <div style="font-size:.75rem;color:#64748b">Avg runtime</div>
+                </div>
+            </div>
         `;
 
         if (!p.runs.length) {

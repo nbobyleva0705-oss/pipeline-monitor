@@ -6,6 +6,7 @@ from services.pipeline_service import (
     create_pipeline,
     get_all_pipelines,
     get_pipeline_by_id,
+    patch_pipeline,
     validate_pipeline,
 )
 from services.run_service import create_run
@@ -34,6 +35,15 @@ def create():
 @bp.get('/<pipeline_id>')
 def get_one(pipeline_id):
     pipeline = get_pipeline_by_id(get_db(), pipeline_id)
+    if not pipeline:
+        return jsonify({'error': 'Pipeline not found'}), 404
+    return jsonify(pipeline)
+
+
+@bp.patch('/<pipeline_id>')
+def update_pipeline(pipeline_id):
+    data = request.get_json(silent=True) or {}
+    pipeline = patch_pipeline(get_db(), pipeline_id, data)
     if not pipeline:
         return jsonify({'error': 'Pipeline not found'}), 404
     return jsonify(pipeline)

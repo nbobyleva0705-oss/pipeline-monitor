@@ -26,15 +26,46 @@
                     <th>Severity</th>
                     <th>Status</th>
                     <th>Pipeline</th>
+                    <th>Run</th>
                     <th>Message</th>
                     <th>Created</th>
                 </tr>
             </thead>
-            <tbody id="tbody"><tr><td colspan="5" class="state-msg">Loading…</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="6" class="state-msg">Loading…</td></tr></tbody>
         </table>
     </div>
 
-    <h2>Alert Rules</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:32px 0 12px;">
+        <h2 style="margin:0">Alert Rules</h2>
+        <button class="btn btn-primary" onclick="showRuleForm()">+ New Rule</button>
+    </div>
+
+    <!-- Create alert rule form -->
+    <div id="rule-form-wrap" style="display:none;background:#fff;border-radius:10px;padding:24px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        <h3 style="margin-bottom:16px">New Alert Rule</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Rule name *</label>
+                <input id="rf-name" type="text" placeholder="runtime-exceeded" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Pipeline *</label>
+                <select id="rf-pipeline" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+                    <option value="">— select pipeline —</option>
+                </select>
+            </div>
+            <div style="grid-column:1/-1">
+                <label style="font-size:.8rem;color:#64748b;display:block;margin-bottom:4px">Condition *</label>
+                <input id="rf-condition" type="text" placeholder="runtime > 10m" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+        </div>
+        <div id="rule-form-error" style="color:#dc2626;font-size:.85rem;margin-top:8px;display:none;"></div>
+        <div style="margin-top:16px;display:flex;gap:8px;">
+            <button class="btn btn-success" onclick="submitRuleForm()">Create</button>
+            <button class="btn" onclick="hideRuleForm()" style="background:#f1f5f9">Cancel</button>
+        </div>
+    </div>
+
     <div class="table-wrap">
         <table>
             <thead>
@@ -65,9 +96,10 @@ async function loadAlerts() {
         }
         tbody.innerHTML = alerts.map(a => `
             <tr>
-                <td>${badge('badge-' + a.severity) ? `<span class="badge badge-${a.severity}">${a.severity}</span>` : a.severity}</td>
+                <td><span class="badge badge-${a.severity}">${a.severity}</span></td>
                 <td>${badge(a.status)}</td>
                 <td>${a.pipeline_name || a.pipeline_id || '—'}</td>
+                <td style="font-size:.78rem;color:#64748b;font-family:monospace">${a.run_id ? a.run_id.slice(0, 8) + '…' : '—'}</td>
                 <td style="font-size:.85rem">${a.message}</td>
                 <td>${fmtDate(a.created_at)}</td>
             </tr>
@@ -121,6 +153,44 @@ async function deleteRule(id, name) {
         loadRules();
     } catch (e) {
         alert(`Error: ${e.message}`);
+    }
+}
+
+async function showRuleForm() {
+    document.getElementById('rule-form-wrap').style.display = 'block';
+    const sel = document.getElementById('rf-pipeline');
+    if (sel.options.length <= 1) {
+        try {
+            const pipelines = await API.getPipelines();
+            pipelines.forEach(p => {
+                const o = document.createElement('option');
+                o.value = p.id;
+                o.textContent = p.name;
+                sel.appendChild(o);
+            });
+        } catch {}
+    }
+}
+
+function hideRuleForm() {
+    document.getElementById('rule-form-wrap').style.display = 'none';
+    document.getElementById('rule-form-error').style.display = 'none';
+}
+
+async function submitRuleForm() {
+    const errEl = document.getElementById('rule-form-error');
+    errEl.style.display = 'none';
+    try {
+        await API.createAlertRule({
+            name: document.getElementById('rf-name').value.trim(),
+            pipeline_id: document.getElementById('rf-pipeline').value,
+            condition: document.getElementById('rf-condition').value.trim(),
+        });
+        hideRuleForm();
+        loadRules();
+    } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
     }
 }
 

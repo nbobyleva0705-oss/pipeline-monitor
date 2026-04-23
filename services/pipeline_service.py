@@ -89,4 +89,33 @@ def get_pipeline_by_id(db, pipeline_id):
     ).fetchall()
     pipeline['alert_rules'] = [dict(r) for r in rules]
 
+    # Attach run statistics
+    stats = db.execute(
+        """SELECT
+               COUNT(*) AS total_runs,
+               SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS success_runs,
+               SUM(CASE WHEN status='failed'  THEN 1 ELSE 0 END) AS failed_runs,
+               AVG(CASE WHEN finished_at IS NOT NULL
+                   THEN (julianday(finished_at) - julianday(started_at)) * 86400
+                   ELSE NULL END) AS avg_runtime_seconds
+           FROM job_runs WHERE pipeline_id = ?""",
+        (pipeline_id,),
+    ).fetchone()
+    pipeline['stats'] = dict(stats)
+
     return pipeline
+
+
+def patch_pipeline(db, pipeline_id, data):
+    pipeline = db.execute("SELECT * FROM pipelines WHERE id = ?", (pipeline_id,)).fetchone()
+    if not pipeline:
+        return None
+    fields, params = [], []
+    if 'active' in data:
+        fields.append("active = ?")
+        params.append(1 if data['active'] else 0)
+    if fields:
+        params.append(pipeline_id)
+        db.execute(f"UPDATE pipelines SET {', '.join(fields)} WHERE id = ?", params)
+        db.commit()
+    return get_pipeline_by_id(db, pipeline_id)

@@ -25,6 +25,7 @@ const API = {
     getPipelines:     ()       => API._fetch('/pipelines/'),
     getPipeline:      (id)     => API._fetch(`/pipelines/${id}`),
     createPipeline:   (body)   => API._fetch('/pipelines/', { method: 'POST', body: JSON.stringify(body) }),
+    patchPipeline:    (id, b)  => API._fetch(`/pipelines/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
     runPipeline:      (id)     => API._fetch(`/pipelines/${id}/run`, { method: 'POST' }),
 
     // Runs
