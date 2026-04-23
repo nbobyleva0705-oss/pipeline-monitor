@@ -103,7 +103,47 @@ def get_pipeline_by_id(db, pipeline_id):
     ).fetchone()
     pipeline['stats'] = dict(stats)
 
+    # Attach current version
+    current_ver = db.execute(
+        "SELECT * FROM pipeline_versions WHERE pipeline_id = ? ORDER BY version DESC LIMIT 1",
+        (pipeline_id,),
+    ).fetchone()
+    pipeline['current_version'] = dict(current_ver) if current_ver else None
+
     return pipeline
+
+
+def get_pipeline_versions(db, pipeline_id):
+    rows = db.execute(
+        "SELECT * FROM pipeline_versions WHERE pipeline_id = ? ORDER BY version DESC",
+        (pipeline_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_pipeline_version(db, pipeline_id, data):
+    pipeline = db.execute("SELECT id FROM pipelines WHERE id = ?", (pipeline_id,)).fetchone()
+    if not pipeline:
+        raise ValueError("Pipeline not found")
+
+    last = db.execute(
+        "SELECT version FROM pipeline_versions WHERE pipeline_id = ? ORDER BY version DESC LIMIT 1",
+        (pipeline_id,),
+    ).fetchone()
+    next_version = (last['version'] + 1) if last else 1
+
+    config = json.dumps(data.get('config', {}))
+    db.execute(
+        "INSERT INTO pipeline_versions (pipeline_id, version, config) VALUES (?, ?, ?)",
+        (pipeline_id, next_version, config),
+    )
+    db.commit()
+
+    row = db.execute(
+        "SELECT * FROM pipeline_versions WHERE pipeline_id = ? AND version = ?",
+        (pipeline_id, next_version),
+    ).fetchone()
+    return dict(row)
 
 
 def patch_pipeline(db, pipeline_id, data):

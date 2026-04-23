@@ -25,8 +25,10 @@ const API = {
     getPipelines:     ()       => API._fetch('/pipelines/'),
     getPipeline:      (id)     => API._fetch(`/pipelines/${id}`),
     createPipeline:   (body)   => API._fetch('/pipelines/', { method: 'POST', body: JSON.stringify(body) }),
-    patchPipeline:    (id, b)  => API._fetch(`/pipelines/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
-    runPipeline:      (id)     => API._fetch(`/pipelines/${id}/run`, { method: 'POST' }),
+    patchPipeline:      (id, b)    => API._fetch(`/pipelines/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
+    getPipelineVersions:(id)       => API._fetch(`/pipelines/${id}/versions`),
+    createPipelineVersion:(id, b)  => API._fetch(`/pipelines/${id}/versions`, { method: 'POST', body: JSON.stringify(b) }),
+    runPipeline:        (id)       => API._fetch(`/pipelines/${id}/run`, { method: 'POST' }),
 
     // Runs
     getRuns:          (params) => API._fetch('/runs/?' + new URLSearchParams(params || {})),

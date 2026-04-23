@@ -77,10 +77,34 @@
             <button class="btn" onclick="closeDetail()" style="background:#f1f5f9">Close</button>
         </div>
         <div id="dp-meta"></div>
-        <h2 style="margin-top:24px;margin-bottom:12px">Runs</h2>
+        <!-- Versions block -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;margin-bottom:12px">
+            <h2 style="margin:0">Versions</h2>
+            <button class="btn btn-primary btn-sm" onclick="showVersionForm()">+ New version</button>
+        </div>
+
+        <!-- New version form -->
+        <div id="ver-form" style="display:none;background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:16px;">
+            <p style="margin:0 0 8px;font-size:.83rem;color:#475569">Zadej nový config pipeline jako JSON:</p>
+            <textarea id="ver-config" rows="4" placeholder='{"engine": "spark", "query": "SELECT ..."}' style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-family:monospace;font-size:.82rem;box-sizing:border-box;"></textarea>
+            <div id="ver-error" style="color:#dc2626;font-size:.82rem;margin-top:6px;display:none;"></div>
+            <div style="margin-top:10px;display:flex;gap:8px;">
+                <button class="btn btn-success btn-sm" onclick="submitVersion()">Create</button>
+                <button class="btn btn-sm" onclick="hideVersionForm()" style="background:#e2e8f0">Cancel</button>
+            </div>
+        </div>
+
+        <div class="table-wrap" style="margin:0 0 24px;">
+            <table>
+                <thead><tr><th>Version</th><th>Created</th><th>Config</th></tr></thead>
+                <tbody id="dp-versions"><tr><td colspan="3" class="state-msg">Loading…</td></tr></tbody>
+            </table>
+        </div>
+
+        <h2 style="margin-top:0;margin-bottom:12px">Runs</h2>
         <div class="table-wrap" style="margin:0">
             <table>
-                <thead><tr><th>Status</th><th>Started</th><th>Finished</th><th>Runtime</th><th>Records</th><th>Error</th></tr></thead>
+                <thead><tr><th>Status</th><th>Version</th><th>Started</th><th>Finished</th><th>Runtime</th><th>Records</th><th>Error</th></tr></thead>
                 <tbody id="dp-runs"></tbody>
             </table>
         </div>
@@ -188,10 +212,13 @@ async function runPipeline(id, name) {
 }
 
 async function openDetail(id) {
+    currentPipelineId = id;
     const panel = document.getElementById('detail-panel');
     panel.style.display = 'block';
+    hideVersionForm();
     document.getElementById('dp-meta').innerHTML = 'Loading…';
     document.getElementById('dp-runs').innerHTML = '';
+    document.getElementById('dp-versions').innerHTML = '<tr><td colspan="3" class="state-msg">Loading…</td></tr>';
 
     try {
         const p = await API.getPipeline(id);
@@ -228,12 +255,16 @@ async function openDetail(id) {
             </div>
         `;
 
+        // Load versions
+        loadVersions(p.id);
+
         if (!p.runs.length) {
-            document.getElementById('dp-runs').innerHTML = '<tr><td colspan="6" class="state-msg">No runs.</td></tr>';
+            document.getElementById('dp-runs').innerHTML = '<tr><td colspan="7" class="state-msg">No runs.</td></tr>';
         } else {
             document.getElementById('dp-runs').innerHTML = p.runs.map(r => `
                 <tr>
                     <td>${badge(r.status)}</td>
+                    <td><span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:12px;font-size:.78rem;font-weight:600">v${r.pipeline_version}</span></td>
                     <td>${fmtDate(r.started_at)}</td>
                     <td>${fmtDate(r.finished_at)}</td>
                     <td>${fmtRuntime(r.started_at, r.finished_at)}</td>
@@ -248,8 +279,66 @@ async function openDetail(id) {
     }
 }
 
+let currentPipelineId = null;
+
+async function loadVersions(pipelineId) {
+    const tbody = document.getElementById('dp-versions');
+    try {
+        const versions = await API.getPipelineVersions(pipelineId);
+        if (!versions.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="state-msg">No versions.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = versions.map((v, i) => {
+            let configStr = '—';
+            try { configStr = JSON.stringify(JSON.parse(v.config), null, 2); } catch {}
+            const isEmpty = configStr === '{}' || configStr === 'null';
+            return `<tr>
+                <td>
+                    <span style="background:#e0e7ff;color:#3730a3;padding:3px 10px;border-radius:12px;font-size:.82rem;font-weight:700">v${v.version}</span>
+                    ${i === 0 ? '<span style="margin-left:6px;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600">current</span>' : ''}
+                </td>
+                <td style="font-size:.83rem;color:#64748b">${fmtDate(v.created_at)}</td>
+                <td><code style="font-size:.78rem;color:#475569">${isEmpty ? '(empty)' : configStr.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</code></td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="3" class="state-msg error">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function showVersionForm() {
+    document.getElementById('ver-form').style.display = 'block';
+    document.getElementById('ver-config').value = '';
+    document.getElementById('ver-error').style.display = 'none';
+}
+
+function hideVersionForm() {
+    document.getElementById('ver-form').style.display = 'none';
+}
+
+async function submitVersion() {
+    const errEl = document.getElementById('ver-error');
+    errEl.style.display = 'none';
+    const raw = document.getElementById('ver-config').value.trim();
+    let config = {};
+    if (raw) {
+        try { config = JSON.parse(raw); }
+        catch { errEl.textContent = 'Neplatný JSON'; errEl.style.display = 'block'; return; }
+    }
+    try {
+        await API.createPipelineVersion(currentPipelineId, { config });
+        hideVersionForm();
+        loadVersions(currentPipelineId);
+    } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+    }
+}
+
 function closeDetail() {
     document.getElementById('detail-panel').style.display = 'none';
+    currentPipelineId = null;
 }
 
 load();

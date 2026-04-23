@@ -4,8 +4,10 @@ from flask import Blueprint, jsonify, request
 from db import get_db
 from services.pipeline_service import (
     create_pipeline,
+    create_pipeline_version,
     get_all_pipelines,
     get_pipeline_by_id,
+    get_pipeline_versions,
     patch_pipeline,
     validate_pipeline,
 )
@@ -47,6 +49,24 @@ def update_pipeline(pipeline_id):
     if not pipeline:
         return jsonify({'error': 'Pipeline not found'}), 404
     return jsonify(pipeline)
+
+
+@bp.get('/<pipeline_id>/versions')
+def list_versions(pipeline_id):
+    pipeline = get_pipeline_by_id(get_db(), pipeline_id)
+    if not pipeline:
+        return jsonify({'error': 'Pipeline not found'}), 404
+    return jsonify(get_pipeline_versions(get_db(), pipeline_id))
+
+
+@bp.post('/<pipeline_id>/versions')
+def add_version(pipeline_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        version = create_pipeline_version(get_db(), pipeline_id, data)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify(version), 201
 
 
 @bp.post('/<pipeline_id>/run')
